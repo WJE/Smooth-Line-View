@@ -35,6 +35,7 @@ static const CGFloat kPointMinDistance = 5.0f;
 static const CGFloat kPointMinDistanceSquared = kPointMinDistance * kPointMinDistance;
 
 @interface SmoothLineView ()
+@property (nonatomic) CGPoint startPoint;
 @property (nonatomic,assign) CGPoint currentPoint;
 @property (nonatomic,assign) CGPoint previousPoint;
 @property (nonatomic,assign) CGPoint previousPreviousPoint;
@@ -119,6 +120,7 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
   self.previousPoint = [touch previousLocationInView:self];
   self.previousPreviousPoint = [touch previousLocationInView:self];
   self.currentPoint = [touch locationInView:self];
+    self.startPoint = [touch locationInView:self];
 
   // call touchesMoved:withEvent:, to possibly draw on zero movement
   [self touchesMoved:touches withEvent:event];
@@ -142,10 +144,13 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
   self.previousPreviousPoint = self.previousPoint;
   self.previousPoint = [touch previousLocationInView:self];
   self.currentPoint = [touch locationInView:self];
-  
+    
   CGPoint mid1 = midPoint(self.previousPoint, self.previousPreviousPoint);
   CGPoint mid2 = midPoint(self.currentPoint, self.previousPoint);
 
+    CGPathAddLineToPoint(_path, NULL, mid1.x, mid1.y);
+    CGPathAddLineToPoint(_path, NULL, mid2.x, mid2.y);
+    
   // to represent the finger movement, create a new path segment,
   // a quadratic bezier path from mid1 to mid2, using previous as a control point
   CGMutablePathRef subpath = CGPathCreateMutable();
@@ -187,6 +192,13 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 - (BOOL) didChange
 {
     return !self.path.isEmpty;
+}
+
+- (void) closeSubpath
+{
+    CGPathAddLineToPoint(_path, NULL, self.startPoint.x, self.startPoint.y);
+    CGPathCloseSubpath(_path);
+    [self setNeedsDisplay];
 }
 
 @end
