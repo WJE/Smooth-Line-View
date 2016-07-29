@@ -178,7 +178,8 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 
 - (BOOL) didChange
 {
-    return !self.path.isEmpty;
+    return !self.path.isEmpty
+        && (self.path.bounds.size.width > 0 || self.path.bounds.size.height > 0);
 }
 
 - (void) closeSubpath
