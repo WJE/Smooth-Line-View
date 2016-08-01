@@ -96,6 +96,14 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
   CGContextSetStrokeColorWithColor(context, self.lineColor.CGColor);
   
   CGContextStrokePath(context);
+    
+    if (self.renderAsArea)
+    {
+        CGContextAddPath(context, _path);
+        CGContextSetFillColorWithColor(context, [UIColor redColor].CGColor);
+        CGContextSetAlpha(context, 0.2);
+        CGContextFillPath(context);
+    }
   
   self.empty = NO;
 }
