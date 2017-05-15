@@ -41,4 +41,6 @@
 - (void) setPath: (UIBezierPath*) bezierPath;
 - (BOOL) didChange;
 - (void) closeSubpath;
+- (void) undo;
+
 @end

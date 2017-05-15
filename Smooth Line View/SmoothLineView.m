@@ -39,6 +39,8 @@
 @property (nonatomic,assign) CGPoint previousPoint;
 @property (nonatomic,assign) CGPoint previousPreviousPoint;
 
+@property (nonatomic, strong) NSMutableArray* pathSnapshots;
+
 #pragma mark Private Helper function
 CGPoint midPoint(CGPoint p1, CGPoint p2);
 @end
@@ -60,10 +62,11 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
   
   if (self) {
     // NOTE: do not change the backgroundColor here, so it can be set in IB.
-		_path = CGPathCreateMutable();
-    _lineWidth = DEFAULT_WIDTH;
-    _lineColor = DEFAULT_COLOR;
-    _empty = YES;
+      _path = CGPathCreateMutable();
+      _lineWidth = DEFAULT_WIDTH;
+      _lineColor = DEFAULT_COLOR;
+      _empty = YES;
+      _pathSnapshots = [NSMutableArray new];
   }
   
   return self;
@@ -73,11 +76,12 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
   self = [super initWithFrame:frame];
   
   if (self) {
-    self.backgroundColor = DEFAULT_BACKGROUND_COLOR;
-		_path = CGPathCreateMutable();
-    _lineWidth = DEFAULT_WIDTH;
-    _lineColor = DEFAULT_COLOR;
-    _empty = YES;
+      self.backgroundColor = DEFAULT_BACKGROUND_COLOR;
+      _path = CGPathCreateMutable();
+      _lineWidth = DEFAULT_WIDTH;
+      _lineColor = DEFAULT_COLOR;
+      _empty = YES;
+      _pathSnapshots = [NSMutableArray new];
   }
   
   return self;
@@ -165,13 +169,20 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
     [self setNeedsDisplayInRect:CGPathGetBoundingBox(_path)];
 }
 
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{    
+    [self.pathSnapshots addObject:self.path];
+}
+
 #pragma mark interface
 
 -(void)clear {
-  CGMutablePathRef oldPath = _path;
-  CFRelease(oldPath);
-  _path = CGPathCreateMutable();
-  [self setNeedsDisplay];
+    CGMutablePathRef oldPath = _path;
+    CFRelease(oldPath);
+    _path = CGPathCreateMutable();
+    
+    self.pathSnapshots = [NSMutableArray new];
+    [self setNeedsDisplay];
 }
 
 - (UIBezierPath*) path
@@ -200,6 +211,25 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
     //  | This method fills the path using the current fill color and drawing properties. If the path contains any open subpaths, this method implicitly closes them before painting the fill region.
     //
     CGPathCloseSubpath(_path);
+    [self setNeedsDisplay];
+}
+
+- (void) undo
+{
+    CGMutablePathRef oldPath = _path;
+    CGPathRelease(oldPath);
+    
+    [self.pathSnapshots removeLastObject];
+    if (self.pathSnapshots.count > 0)
+    {
+        UIBezierPath* path = [self.pathSnapshots lastObject];
+        [self setPath:path];
+    }
+    else
+    {
+        _path = CGPathCreateMutable();
+    }
+    
     [self setNeedsDisplay];
 }
 
