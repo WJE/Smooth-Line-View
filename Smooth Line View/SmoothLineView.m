@@ -39,6 +39,7 @@
 @property (nonatomic,assign) CGPoint previousPoint;
 @property (nonatomic,assign) CGPoint previousPreviousPoint;
 
+@property (nonatomic, strong) UIBezierPath* bzPath;
 @property (nonatomic, strong) NSMutableArray* pathSnapshots;
 
 #pragma mark Private Helper function
@@ -47,8 +48,11 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
 
 @implementation SmoothLineView {
 @private
-	CGMutablePathRef _path;
+    CGMutablePathRef _path;
 }
+
+@synthesize myTransform = _myTransform;
+@synthesize myScale = _myScale;
 
 #pragma mark UIView lifecycle methods
 
@@ -57,49 +61,109 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     return [CATiledLayer class];
 }
 
-- (id)initWithCoder:(NSCoder *)aDecoder {
-  self = [super initWithCoder:aDecoder];
-  
-  if (self) {
-    // NOTE: do not change the backgroundColor here, so it can be set in IB.
-      _path = CGPathCreateMutable();
-      _lineWidth = DEFAULT_WIDTH;
-      _lineColor = DEFAULT_COLOR;
-      _empty = YES;
-      _pathSnapshots = [NSMutableArray new];
-  }
-  
-  return self;
+- (id) initWithCoder:(NSCoder *)aDecoder
+{
+    self = [super initWithCoder:aDecoder];
+    
+    if (self)
+    {
+        // NOTE: do not change the backgroundColor here, so it can be set in IB.
+        _path = CGPathCreateMutable();
+        _lineWidth = DEFAULT_WIDTH;
+        _lineColor = DEFAULT_COLOR;
+        _empty = YES;
+        _pathSnapshots = [NSMutableArray new];
+    }
+    
+    return self;
 }
 
-- (id)initWithFrame:(CGRect)frame {
-  self = [super initWithFrame:frame];
-  
-  if (self) {
-      self.backgroundColor = DEFAULT_BACKGROUND_COLOR;
-      _path = CGPathCreateMutable();
-      _lineWidth = DEFAULT_WIDTH;
-      _lineColor = DEFAULT_COLOR;
-      _empty = YES;
-      _pathSnapshots = [NSMutableArray new];
-  }
-  
-  return self;
+- (id) initWithFrame:(CGRect)frame
+{
+    self = [super initWithFrame:frame];
+    
+    if (self)
+    {
+        self.backgroundColor = DEFAULT_BACKGROUND_COLOR;
+        _path = CGPathCreateMutable();
+        _lineWidth = DEFAULT_WIDTH;
+        _lineColor = DEFAULT_COLOR;
+        _empty = YES;
+        _pathSnapshots = [NSMutableArray new];
+        _myTransform = CGAffineTransformIdentity;
+        _myScale = 1.0;
+        self.multipleTouchEnabled = YES;
+        self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
+    }
+    
+    return self;
 }
 
-- (void)drawRect:(CGRect)rect {
-  // clear rect
-  [self.backgroundColor set];
-  UIRectFill(rect);
-  
-  // get the graphics context and draw the path
-  CGContextRef context = UIGraphicsGetCurrentContext();
-	CGContextAddPath(context, _path);
-  CGContextSetLineCap(context, kCGLineCapRound);
-  CGContextSetLineWidth(context, self.lineWidth);
-  CGContextSetStrokeColorWithColor(context, self.lineColor.CGColor);
-  
-  CGContextStrokePath(context);
+- (id) initWithFrame:(CGRect)frame path:(UIBezierPath*)path andPathSnapshots:(NSArray*)snapshots
+{
+    self = [self initWithFrame:frame];
+    
+    if (self)
+    {
+        _path = CGPathCreateMutableCopy(path.CGPath);
+        _pathSnapshots = snapshots != nil ? [snapshots mutableCopy] : [NSMutableArray new];
+        self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
+    }
+    
+    return self;
+}
+
+- (void)setMyScale:(CGFloat)myScale
+{
+    _myScale = myScale;
+    
+    if (_path)
+    {
+        CGAffineTransform transform = CGAffineTransformMakeScale(myScale, myScale);
+        UIBezierPath* path = [self path];
+        [path applyTransform:transform];
+        [self setPath:path];
+        [self setNeedsDisplay];
+    }
+}
+
+- (void) setMyTransform:(CGAffineTransform)myTransform
+{
+    UIBezierPath* path = [self.pathSnapshots lastObject];
+    [path applyTransform:_myTransform];
+    
+    _myTransform = myTransform;
+    
+    if (_path)
+    {
+        UIBezierPath* path = [self path];
+        [path applyTransform:myTransform];
+        [self setPath:path];
+        [self setNeedsDisplay];
+    }
+}
+
+- (void) setBackgroundColor:(UIColor *)backgroundColor
+{
+    [super setBackgroundColor:backgroundColor];
+    
+    _bgColor = backgroundColor;
+}
+
+- (void) drawRect:(CGRect)rect {
+    // clear rect
+    //    UIColor* color = self.backgroundColor;
+    [self.bgColor set];
+    UIRectFill(rect);
+    
+    // get the graphics context and draw the path
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextAddPath(context, _path);
+    CGContextSetLineCap(context, kCGLineCapRound);
+    CGContextSetLineWidth(context, self.lineWidth);
+    CGContextSetStrokeColorWithColor(context, self.lineColor.CGColor);
+    
+    CGContextStrokePath(context);
     
     if (self.renderAsArea)
     {
@@ -108,75 +172,107 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
         CGContextSetAlpha(context, 0.2);
         CGContextFillPath(context);
     }
-  
-  self.empty = NO;
+    
+    self.empty = NO;
 }
 
--(void)dealloc {
-	CGPathRelease(_path);
+-(void) dealloc
+{
+    CGPathRelease(_path);
 }
 
 #pragma mark private Helper function
 
 CGPoint midPoint(CGPoint p1, CGPoint p2) {
-  return CGPointMake((p1.x + p2.x) * 0.5, (p1.y + p2.y) * 0.5);
+    return CGPointMake((p1.x + p2.x) * 0.5, (p1.y + p2.y) * 0.5);
 }
 
 #pragma mark Touch event handlers
 
-- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+- (void) touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    UITouch *touch = [touches anyObject];
-
-    // initializes our point records to current location
-    self.previousPoint = [touch previousLocationInView:self];
-    self.previousPreviousPoint = [touch previousLocationInView:self];
-    self.currentPoint = [touch locationInView:self];
-
-    CGPathMoveToPoint(_path, NULL, self.currentPoint.x, self.currentPoint.y);
+    NSLog(@"TOUCHES BEGAN COUNT: %@\n%@", @(touches.count), touches);
+    if (event.allTouches.count == 1)
+    {
+        UITouch *touch = [touches anyObject];
+        
+        // initializes our point records to current location
+        self.previousPoint = [touch previousLocationInView:self];
+        self.previousPreviousPoint = [touch previousLocationInView:self];
+        self.currentPoint = [touch locationInView:self];
+        
+        CGPathMoveToPoint(_path, NULL, self.currentPoint.x, self.currentPoint.y);
+        
+    }
 }
 
-- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
+- (void) touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    UITouch *touch = [touches anyObject];
-    
-    /*
-    CGPoint point = [touch locationInView:self];
-    
-    // if the finger has moved less than the min dist ...
-    CGFloat dx = point.x - self.currentPoint.x;
-    CGFloat dy = point.y - self.currentPoint.y;
-    
-    if ((dx * dx + dy * dy) < kPointMinDistanceSquared) {
-        // ... then ignore this movement
-        return;
+    NSLog(@"TOUCHES MOVED COUNT: %@\n%@", @(touches.count), touches);
+    if (event.allTouches.count == 1)
+    {
+        UITouch *touch = [touches anyObject];
+        
+        /*
+         CGPoint point = [touch locationInView:self];
+         
+         // if the finger has moved less than the min dist ...
+         CGFloat dx = point.x - self.currentPoint.x;
+         CGFloat dy = point.y - self.currentPoint.y;
+         
+         if ((dx * dx + dy * dy) < kPointMinDistanceSquared) {
+         // ... then ignore this movement
+         return;
+         }
+         */
+        
+        // update points: previousPrevious -> mid1 -> previous -> mid2 -> current
+        self.previousPreviousPoint = self.previousPoint;
+        self.previousPoint = [touch previousLocationInView:self];
+        self.currentPoint = [touch locationInView:self];
+        
+        CGPoint mid2 = midPoint(self.currentPoint, self.previousPoint);
+        
+        // to represent the finger movement, add a quadratic bezier path
+        // from current point to mid2, using previous as a control point
+        CGPathAddQuadCurveToPoint(_path, NULL,
+                                  self.previousPoint.x, self.previousPoint.y,
+                                  mid2.x, mid2.y);
     }
-     */
-    
-    // update points: previousPrevious -> mid1 -> previous -> mid2 -> current
-    self.previousPreviousPoint = self.previousPoint;
-    self.previousPoint = [touch previousLocationInView:self];
-    self.currentPoint = [touch locationInView:self];
-    
-    CGPoint mid2 = midPoint(self.currentPoint, self.previousPoint);
-    
-    // to represent the finger movement, add a quadratic bezier path
-    // from current point to mid2, using previous as a control point
-    CGPathAddQuadCurveToPoint(_path, NULL,
-                              self.previousPoint.x, self.previousPoint.y,
-                              mid2.x, mid2.y);
+    else
+    {
+        _path = CGPathCreateMutableCopy(self.bzPath.CGPath);
+    }
     
     [self setNeedsDisplayInRect:CGPathGetBoundingBox(_path)];
 }
 
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
-{    
-    [self.pathSnapshots addObject:self.path];
+- (void) touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    NSLog(@"TOUCHES ENDED COUNT: %@\n%@", @(touches.count), touches);
+    if (event.allTouches.count == 1)
+    {
+        UIBezierPath* path = [UIBezierPath bezierPathWithCGPath:_path];
+        if (!path.empty)
+        {
+            self.bzPath = path;
+            [self.pathSnapshots addObject:@[self.bzPath, @(self.myScale)]];
+        }
+        else
+        {
+            NSLog(@"Path empty: %@", path);
+        }
+//        CGAffineTransform transform = CGAffineTransformMakeScale(1/self.myScale, 1/self.myScale);
+//        UIBezierPath* pathSnap = [self path];
+//        [pathSnap applyTransform:transform];
+//        [self.pathSnapshots addObject:@[self.bzPath, @(self.myScale)]];
+    }
 }
 
 #pragma mark interface
 
--(void)clear {
+-(void) clear
+{
     CGMutablePathRef oldPath = _path;
     CFRelease(oldPath);
     _path = CGPathCreateMutable();
@@ -193,12 +289,13 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 - (void) setPath:(UIBezierPath*) bezierPath
 {
     _path = CGPathCreateMutableCopy(bezierPath.CGPath) ;
+    self.bzPath = bezierPath;
 }
 
 - (BOOL) didChange
 {
     return !self.path.isEmpty
-        && (self.path.bounds.size.width > 0 || self.path.bounds.size.height > 0);
+    && (self.path.bounds.size.width > 0 || self.path.bounds.size.height > 0);
 }
 
 - (void) closeSubpath
@@ -222,7 +319,16 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
     [self.pathSnapshots removeLastObject];
     if (self.pathSnapshots.count > 0)
     {
-        UIBezierPath* path = [self.pathSnapshots lastObject];
+        NSArray* a = [self.pathSnapshots lastObject];
+        CGFloat scale = [(NSNumber*)a[1] floatValue];
+//        CGFloat s = _myScale/scale;
+        CGAffineTransform t1 = CGAffineTransformMakeScale(1/scale, 1/scale);
+        CGAffineTransform t2 = CGAffineTransformMakeScale(_myScale, _myScale);
+//        CGAffineTransform transform = CGAffineTransformMakeScale(_myScale/scale, _myScale/scale);
+        CGAffineTransform transform = CGAffineTransformConcat(t1, t2);
+        UIBezierPath* path = a[0];
+        [path applyTransform:transform];
+        
         [self setPath:path];
     }
     else

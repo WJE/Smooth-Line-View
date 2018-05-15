@@ -30,12 +30,17 @@
 
 @interface SmoothLineView : UIView 
 
+@property (nonatomic, strong) UIColor *bgColor;
 @property (nonatomic, strong) UIColor *lineColor;
 @property (nonatomic, assign) CGFloat lineWidth;
 @property (nonatomic, assign) BOOL empty;
 @property (nonatomic) BOOL renderAsArea;
+@property (nonatomic, readonly) NSMutableArray* pathSnapshots;
+@property (nonatomic) CGAffineTransform myTransform;
+@property (nonatomic) CGFloat myScale;
 
--(void)clear;
+- (id) initWithFrame:(CGRect)frame path:(UIBezierPath*)path andPathSnapshots:(NSArray*)snapshots;
+- (void) clear;
 
 - (UIBezierPath*) path;
 - (void) setPath: (UIBezierPath*) bezierPath;
