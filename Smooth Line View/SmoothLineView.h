@@ -30,7 +30,6 @@
 
 @interface SmoothLineView : UIView 
 
-@property (nonatomic, strong) UIColor *bgColor;
 @property (nonatomic, strong) UIColor *lineColor;
 @property (nonatomic, assign) CGFloat lineWidth;
 @property (nonatomic, assign) BOOL empty;

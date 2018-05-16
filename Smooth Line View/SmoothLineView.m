@@ -42,6 +42,8 @@
 @property (nonatomic, strong) UIBezierPath* bzPath;
 @property (nonatomic, strong) NSMutableArray* pathSnapshots;
 
+@property (nonatomic, strong) UIColor *bgColor;
+
 #pragma mark Private Helper function
 CGPoint midPoint(CGPoint p1, CGPoint p2);
 @end
