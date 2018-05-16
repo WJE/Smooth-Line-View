@@ -37,8 +37,11 @@
 @property (nonatomic) BOOL renderAsArea;
 @property (nonatomic, readonly) NSMutableArray* pathSnapshots;
 @property (nonatomic) CGAffineTransform myTransform;
+@property (nonatomic) CGFloat myScaleFactor;
 @property (nonatomic) CGFloat myScale;
 
+- (id) initWithFrame:(CGRect)frame andScale:(CGFloat)scale;
+- (id) initWithExistingView:(SmoothLineView*)view;
 - (id) initWithFrame:(CGRect)frame path:(UIBezierPath*)path andPathSnapshots:(NSArray*)snapshots;
 - (void) clear;
 

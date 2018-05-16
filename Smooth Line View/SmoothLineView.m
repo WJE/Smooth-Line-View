@@ -53,6 +53,7 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
 
 @synthesize myTransform = _myTransform;
 @synthesize myScale = _myScale;
+@synthesize myScaleFactor = _myScaleFactor;
 
 #pragma mark UIView lifecycle methods
 
@@ -78,7 +79,7 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     return self;
 }
 
-- (id) initWithFrame:(CGRect)frame
+- (id) initWithFrame:(CGRect)frame andScale:(CGFloat)scale
 {
     self = [super initWithFrame:frame];
     
@@ -91,8 +92,23 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
         _empty = YES;
         _pathSnapshots = [NSMutableArray new];
         _myTransform = CGAffineTransformIdentity;
-        _myScale = 1.0;
+        _myScale = scale;
+        _myScaleFactor = 1.0;
         self.multipleTouchEnabled = YES;
+        self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
+    }
+    
+    return self;
+}
+
+- (id) initWithExistingView:(SmoothLineView*)view
+{
+    self = [self initWithFrame:view.frame andScale:view.myScale];
+    
+    if (self)
+    {
+        _path = CGPathCreateMutableCopy(view.path.CGPath);
+        _pathSnapshots = view.pathSnapshots != nil ? [view.pathSnapshots mutableCopy] : [NSMutableArray new];
         self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
     }
     
@@ -113,18 +129,32 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     return self;
 }
 
-- (void)setMyScale:(CGFloat)myScale
+- (void)setMyScaleFactor:(CGFloat)myScaleFactor
 {
-    _myScale = myScale;
+    _myScaleFactor = myScaleFactor;
     
     if (_path)
     {
-        CGAffineTransform transform = CGAffineTransformMakeScale(myScale, myScale);
+        CGAffineTransform transform = CGAffineTransformMakeScale(myScaleFactor, myScaleFactor);
         UIBezierPath* path = [self path];
         [path applyTransform:transform];
         [self setPath:path];
         [self setNeedsDisplay];
     }
+}
+
+- (void)setMyScale:(CGFloat)myScale
+{
+    _myScale = myScale;
+    
+//    if (_path)
+//    {
+//        CGAffineTransform transform = CGAffineTransformMakeScale(myScale, myScale);
+//        UIBezierPath* path = [self path];
+//        [path applyTransform:transform];
+//        [self setPath:path];
+//        [self setNeedsDisplay];
+//    }
 }
 
 - (void) setMyTransform:(CGAffineTransform)myTransform
@@ -191,7 +221,6 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 
 - (void) touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    NSLog(@"TOUCHES BEGAN COUNT: %@\n%@", @(touches.count), touches);
     if (event.allTouches.count == 1)
     {
         UITouch *touch = [touches anyObject];
@@ -202,13 +231,11 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
         self.currentPoint = [touch locationInView:self];
         
         CGPathMoveToPoint(_path, NULL, self.currentPoint.x, self.currentPoint.y);
-        
     }
 }
 
 - (void) touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    NSLog(@"TOUCHES MOVED COUNT: %@\n%@", @(touches.count), touches);
     if (event.allTouches.count == 1)
     {
         UITouch *touch = [touches anyObject];
@@ -249,7 +276,6 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 
 - (void) touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
-    NSLog(@"TOUCHES ENDED COUNT: %@\n%@", @(touches.count), touches);
     if (event.allTouches.count == 1)
     {
         UIBezierPath* path = [UIBezierPath bezierPathWithCGPath:_path];
@@ -316,6 +342,7 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
     CGMutablePathRef oldPath = _path;
     CGPathRelease(oldPath);
     
+//    CGFloat scale = [(NSNumber*)[self.pathSnapshots lastObject][1] floatValue];
     [self.pathSnapshots removeLastObject];
     if (self.pathSnapshots.count > 0)
     {
@@ -327,9 +354,10 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 //        CGAffineTransform transform = CGAffineTransformMakeScale(_myScale/scale, _myScale/scale);
         CGAffineTransform transform = CGAffineTransformConcat(t1, t2);
         UIBezierPath* path = a[0];
-        [path applyTransform:transform];
+        UIBezierPath* pathCopy = [UIBezierPath bezierPathWithCGPath:path.CGPath];
+        [pathCopy applyTransform:transform];
         
-        [self setPath:path];
+        [self setPath:pathCopy];
     }
     else
     {
