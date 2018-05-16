@@ -51,10 +51,6 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     CGMutablePathRef _path;
 }
 
-@synthesize myTransform = _myTransform;
-@synthesize myScale = _myScale;
-@synthesize myScaleFactor = _myScaleFactor;
-
 #pragma mark UIView lifecycle methods
 
 + (Class)layerClass
@@ -79,7 +75,7 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     return self;
 }
 
-- (id) initWithFrame:(CGRect)frame andScale:(CGFloat)scale
+- (id) initWithFrame:(CGRect)frame
 {
     self = [super initWithFrame:frame];
     
@@ -91,9 +87,6 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
         _lineColor = DEFAULT_COLOR;
         _empty = YES;
         _pathSnapshots = [NSMutableArray new];
-        _myTransform = CGAffineTransformIdentity;
-        _myScale = scale;
-        _myScaleFactor = 1.0;
         self.multipleTouchEnabled = YES;
         self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
     }
@@ -101,75 +94,31 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     return self;
 }
 
-- (id) initWithExistingView:(SmoothLineView*)view
-{
-    self = [self initWithFrame:view.frame andScale:view.myScale];
-    
-    if (self)
-    {
-        _path = CGPathCreateMutableCopy(view.path.CGPath);
-        _pathSnapshots = view.pathSnapshots != nil ? [view.pathSnapshots mutableCopy] : [NSMutableArray new];
-        self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
-    }
-    
-    return self;
-}
-
-- (id) initWithFrame:(CGRect)frame path:(UIBezierPath*)path andPathSnapshots:(NSArray*)snapshots
+- (id) initWithFrame:(CGRect)frame andExistingView:(SmoothLineView*)view;
 {
     self = [self initWithFrame:frame];
     
     if (self)
     {
-        _path = CGPathCreateMutableCopy(path.CGPath);
-        _pathSnapshots = snapshots != nil ? [snapshots mutableCopy] : [NSMutableArray new];
+        _pathSnapshots = [view.pathSnapshots mutableCopy];
+        _path = CGPathCreateMutableCopy(view.path.CGPath);
         self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
+        self.renderAsArea = view.renderAsArea;
     }
     
     return self;
 }
 
-- (void)setMyScaleFactor:(CGFloat)myScaleFactor
+- (void) updateWithTransform:(CGAffineTransform)transform
 {
-    _myScaleFactor = myScaleFactor;
+    UIBezierPath* path = [self path];
+    [path applyTransform:transform];
+    [self setPath:path];
+    [self setNeedsDisplay];
     
-    if (_path)
+    for (UIBezierPath* path in self.pathSnapshots)
     {
-        CGAffineTransform transform = CGAffineTransformMakeScale(myScaleFactor, myScaleFactor);
-        UIBezierPath* path = [self path];
         [path applyTransform:transform];
-        [self setPath:path];
-        [self setNeedsDisplay];
-    }
-}
-
-- (void)setMyScale:(CGFloat)myScale
-{
-    _myScale = myScale;
-    
-//    if (_path)
-//    {
-//        CGAffineTransform transform = CGAffineTransformMakeScale(myScale, myScale);
-//        UIBezierPath* path = [self path];
-//        [path applyTransform:transform];
-//        [self setPath:path];
-//        [self setNeedsDisplay];
-//    }
-}
-
-- (void) setMyTransform:(CGAffineTransform)myTransform
-{
-    UIBezierPath* path = [self.pathSnapshots lastObject];
-    [path applyTransform:_myTransform];
-    
-    _myTransform = myTransform;
-    
-    if (_path)
-    {
-        UIBezierPath* path = [self path];
-        [path applyTransform:myTransform];
-        [self setPath:path];
-        [self setNeedsDisplay];
     }
 }
 
@@ -182,7 +131,9 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
 
 - (void) drawRect:(CGRect)rect {
     // clear rect
-    //    UIColor* color = self.backgroundColor;
+    // we use an internal property because drawRect is called from a background thread
+    // and throws a warning if you try to access [UIView backgroundColor] while
+    // not on the main thread.
     [self.bgColor set];
     UIRectFill(rect);
     
@@ -282,16 +233,8 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
         if (!path.empty)
         {
             self.bzPath = path;
-            [self.pathSnapshots addObject:@[self.bzPath, @(self.myScale)]];
+            [self.pathSnapshots addObject:self.bzPath];
         }
-        else
-        {
-            NSLog(@"Path empty: %@", path);
-        }
-//        CGAffineTransform transform = CGAffineTransformMakeScale(1/self.myScale, 1/self.myScale);
-//        UIBezierPath* pathSnap = [self path];
-//        [pathSnap applyTransform:transform];
-//        [self.pathSnapshots addObject:@[self.bzPath, @(self.myScale)]];
     }
 }
 
@@ -301,10 +244,16 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 {
     CGMutablePathRef oldPath = _path;
     CFRelease(oldPath);
-    _path = CGPathCreateMutable();
+    [self clearPath];
     
     self.pathSnapshots = [NSMutableArray new];
     [self setNeedsDisplay];
+}
+
+- (void) clearPath
+{
+    _path = CGPathCreateMutable();
+    self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
 }
 
 - (UIBezierPath*) path
@@ -342,26 +291,15 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
     CGMutablePathRef oldPath = _path;
     CGPathRelease(oldPath);
     
-//    CGFloat scale = [(NSNumber*)[self.pathSnapshots lastObject][1] floatValue];
     [self.pathSnapshots removeLastObject];
     if (self.pathSnapshots.count > 0)
     {
-        NSArray* a = [self.pathSnapshots lastObject];
-        CGFloat scale = [(NSNumber*)a[1] floatValue];
-//        CGFloat s = _myScale/scale;
-        CGAffineTransform t1 = CGAffineTransformMakeScale(1/scale, 1/scale);
-        CGAffineTransform t2 = CGAffineTransformMakeScale(_myScale, _myScale);
-//        CGAffineTransform transform = CGAffineTransformMakeScale(_myScale/scale, _myScale/scale);
-        CGAffineTransform transform = CGAffineTransformConcat(t1, t2);
-        UIBezierPath* path = a[0];
-        UIBezierPath* pathCopy = [UIBezierPath bezierPathWithCGPath:path.CGPath];
-        [pathCopy applyTransform:transform];
-        
-        [self setPath:pathCopy];
+        UIBezierPath* path = [self.pathSnapshots lastObject];
+        [self setPath:path];
     }
     else
     {
-        _path = CGPathCreateMutable();
+        [self clearPath];
     }
     
     [self setNeedsDisplay];
