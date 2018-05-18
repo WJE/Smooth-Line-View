@@ -135,7 +135,6 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     // we use an internal property because drawRect is called from a background thread
     // and throws a warning if you try to access [UIView backgroundColor] while
     // not on the main thread.
-    [NSThread sleepForTimeInterval:0.2];
     [self.bgColor set];
     UIRectFill(rect);
     
