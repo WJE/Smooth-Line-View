@@ -264,6 +264,7 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 
 - (void) setPath:(UIBezierPath*) bezierPath
 {
+    NSAssert(bezierPath != nil, @"Bezier path should not be nil");
     CGMutablePathRef oldPath = _path;
     CGPathRelease(oldPath);
     _path = CGPathCreateMutableCopy(bezierPath.CGPath) ;
