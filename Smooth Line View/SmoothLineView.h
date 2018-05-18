@@ -34,8 +34,11 @@
 @property (nonatomic, assign) CGFloat lineWidth;
 @property (nonatomic, assign) BOOL empty;
 @property (nonatomic) BOOL renderAsArea;
+@property (nonatomic, readonly) NSMutableArray* pathSnapshots;
 
--(void)clear;
+- (id) initWithFrame:(CGRect)frame andExistingView:(SmoothLineView*)view;
+- (void) updateWithTransform:(CGAffineTransform)transform;
+- (void) clear;
 
 - (UIBezierPath*) path;
 - (void) setPath: (UIBezierPath*) bezierPath;
