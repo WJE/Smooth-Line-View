@@ -103,9 +103,8 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     if (self)
     {
         _pathSnapshots = [view.pathSnapshots mutableCopy];
-        _path = CGPathCreateMutableCopy(view.path.CGPath);
-        self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
         self.renderAsArea = view.renderAsArea;
+        [self setPath:view.path];
     }
     
     return self;
@@ -136,6 +135,7 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     // we use an internal property because drawRect is called from a background thread
     // and throws a warning if you try to access [UIView backgroundColor] while
     // not on the main thread.
+    [NSThread sleepForTimeInterval:0.2];
     [self.bgColor set];
     UIRectFill(rect);
     
@@ -221,7 +221,7 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
     }
     else
     {
-        _path = CGPathCreateMutableCopy(self.bzPath.CGPath);
+        [self setPath:self.bzPath];
     }
     
     [self setNeedsDisplayInRect:CGPathGetBoundingBox(_path)];
@@ -244,8 +244,6 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 
 -(void) clear
 {
-    CGMutablePathRef oldPath = _path;
-    CFRelease(oldPath);
     [self clearPath];
     
     self.pathSnapshots = [NSMutableArray new];
@@ -254,6 +252,8 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 
 - (void) clearPath
 {
+    CGMutablePathRef oldPath = _path;
+    CGPathRelease(oldPath);
     _path = CGPathCreateMutable();
     self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
 }
@@ -265,6 +265,8 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 
 - (void) setPath:(UIBezierPath*) bezierPath
 {
+    CGMutablePathRef oldPath = _path;
+    CGPathRelease(oldPath);
     _path = CGPathCreateMutableCopy(bezierPath.CGPath) ;
     self.bzPath = bezierPath;
 }
@@ -290,9 +292,6 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 
 - (void) undo
 {
-    CGMutablePathRef oldPath = _path;
-    CGPathRelease(oldPath);
-    
     [self.pathSnapshots removeLastObject];
     if (self.pathSnapshots.count > 0)
     {
