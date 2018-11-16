@@ -50,12 +50,13 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
 
 @implementation SmoothLineView {
 @private
-    CGMutablePathRef _path;
+    CGMutablePathRef _fullPath;
+    CGMutablePathRef _drawnPath;
 }
 
 #pragma mark UIView lifecycle methods
 
-+ (Class)layerClass
++ (Class) layerClass
 {
     return [CATiledLayer class];
 }
@@ -67,7 +68,8 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     if (self)
     {
         // NOTE: do not change the backgroundColor here, so it can be set in IB.
-        _path = CGPathCreateMutable();
+        _fullPath = CGPathCreateMutable();
+        _drawnPath = CGPathCreateMutable();
         _lineWidth = DEFAULT_WIDTH;
         _lineColor = DEFAULT_COLOR;
         _empty = YES;
@@ -84,27 +86,14 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     if (self)
     {
         self.backgroundColor = DEFAULT_BACKGROUND_COLOR;
-        _path = CGPathCreateMutable();
+        _fullPath = CGPathCreateMutable();
+        _drawnPath = CGPathCreateMutable();
         _lineWidth = DEFAULT_WIDTH;
         _lineColor = DEFAULT_COLOR;
         _empty = YES;
         _pathSnapshots = [NSMutableArray new];
         self.multipleTouchEnabled = YES;
-        self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
-    }
-    
-    return self;
-}
-
-- (id) initWithFrame:(CGRect)frame andExistingView:(SmoothLineView*)view;
-{
-    self = [self initWithFrame:frame];
-    
-    if (self)
-    {
-        _pathSnapshots = [view.pathSnapshots mutableCopy];
-        self.renderAsArea = view.renderAsArea;
-        [self setPath:view.path];
+        self.bzPath = [UIBezierPath bezierPathWithCGPath:_fullPath];
     }
     
     return self;
@@ -138,21 +127,26 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
     [self.bgColor set];
     UIRectFill(rect);
     
-    // get the graphics context and draw the path
-    CGContextRef context = UIGraphicsGetCurrentContext();
-    CGContextAddPath(context, _path);
-    CGContextSetLineCap(context, kCGLineCapRound);
-    CGContextSetLineWidth(context, self.lineWidth);
-    CGContextSetStrokeColorWithColor(context, self.lineColor.CGColor);
-    
-    CGContextStrokePath(context);
-    
-    if (self.renderAsArea)
+    @synchronized (self)
     {
-        CGContextAddPath(context, _path);
-        CGContextSetFillColorWithColor(context, [UIColor redColor].CGColor);
-        CGContextSetAlpha(context, 0.2);
-        CGContextFillPath(context);
+        // get the graphics context and draw the path
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        CGContextAddPath(context, _fullPath);
+        CGContextAddPath(context, _drawnPath);
+        CGContextSetLineCap(context, kCGLineCapRound);
+        CGContextSetLineWidth(context, self.lineWidth);
+        CGContextSetStrokeColorWithColor(context, self.lineColor.CGColor);
+        
+        CGContextStrokePath(context);
+        
+        if (self.renderAsArea)
+        {
+            CGContextAddPath(context, _fullPath);
+            CGContextAddPath(context, _drawnPath);
+            CGContextSetFillColorWithColor(context, [UIColor redColor].CGColor);
+            CGContextSetAlpha(context, 0.2);
+            CGContextFillPath(context);
+        }
     }
     
     self.empty = NO;
@@ -160,7 +154,8 @@ CGPoint midPoint(CGPoint p1, CGPoint p2);
 
 -(void) dealloc
 {
-    CGPathRelease(_path);
+    CGPathRelease(_fullPath);
+    CGPathRelease(_drawnPath);
 }
 
 #pragma mark private Helper function
@@ -182,7 +177,8 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
         self.previousPreviousPoint = [touch previousLocationInView:self];
         self.currentPoint = [touch locationInView:self];
         
-        CGPathMoveToPoint(_path, NULL, self.currentPoint.x, self.currentPoint.y);
+        CGPathMoveToPoint(_drawnPath, NULL, self.currentPoint.x, self.currentPoint.y);
+        LogMessage(INFO, @"Move to Point: (%@, %@)", @(self.currentPoint.x), @(self.currentPoint.y));
     }
 }
 
@@ -214,27 +210,45 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
         
         // to represent the finger movement, add a quadratic bezier path
         // from current point to mid2, using previous as a control point
-        CGPathAddQuadCurveToPoint(_path, NULL,
+        CGPathAddQuadCurveToPoint(_drawnPath, NULL,
                                   self.previousPoint.x, self.previousPoint.y,
                                   mid2.x, mid2.y);
+        
+        LogMessage(INFO, @"Quad Curve to Point: (%@, %@), CP (%@, %@)", @(mid2.x), @(mid2.y), @(self.previousPoint.x), @(self.previousPoint.y));
     }
     else
     {
         [self setPath:self.bzPath];
     }
     
-    [self setNeedsDisplayInRect:CGPathGetBoundingBox(_path)];
+    [self setNeedsDisplayInRect:CGPathGetBoundingBox(_drawnPath)];
 }
 
 - (void) touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
     if (event.allTouches.count == 1)
     {
-        UIBezierPath* path = [UIBezierPath bezierPathWithCGPath:_path];
-        if (!path.empty)
+        UIBezierPath* drawnPath = [UIBezierPath bezierPathWithCGPath:_drawnPath];
+        UIBezierPath* fullPath = [UIBezierPath bezierPathWithCGPath:_fullPath];
+        LogMessage(INFO, @"Touch Ended - Path: %@", drawnPath);
+        if (!drawnPath.empty && (drawnPath.bounds.size.width != 0 && drawnPath.bounds.size.height != 0))
         {
-            self.bzPath = path;
+            @synchronized (self)
+            {
+                [fullPath appendPath:drawnPath];
+                CGMutablePathRef oldPath = _fullPath;
+                CGPathRelease(oldPath);
+                _fullPath = CGPathCreateMutableCopy(fullPath.CGPath);
+            }
+            self.bzPath = fullPath;
             [self.pathSnapshots addObject:self.bzPath];
+        }
+        
+        @synchronized (self)
+        {
+            CGMutablePathRef oldPath = _drawnPath;
+            CGPathRelease(oldPath);
+            _drawnPath = CGPathCreateMutable();
         }
     }
 }
@@ -251,23 +265,28 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 
 - (void) clearPath
 {
-    CGMutablePathRef oldPath = _path;
+    CGMutablePathRef oldPath = _fullPath;
     CGPathRelease(oldPath);
-    _path = CGPathCreateMutable();
-    self.bzPath = [UIBezierPath bezierPathWithCGPath:_path];
+    oldPath = _drawnPath;
+    CGPathRelease(oldPath);
+    _fullPath = CGPathCreateMutable();
+    _drawnPath = CGPathCreateMutable();
+    self.bzPath = [UIBezierPath bezierPathWithCGPath:_fullPath];
 }
 
 - (UIBezierPath*) path
 {
-    return [UIBezierPath bezierPathWithCGPath:_path];
+    return [UIBezierPath bezierPathWithCGPath:_fullPath];
 }
 
 - (void) setPath:(UIBezierPath*) bezierPath
 {
     NSAssert(bezierPath != nil, @"Bezier path should not be nil");
-    CGMutablePathRef oldPath = _path;
-    CGPathRelease(oldPath);
-    _path = CGPathCreateMutableCopy(bezierPath.CGPath) ;
+    @synchronized (self) {
+        CGMutablePathRef oldPath = _fullPath;
+        CGPathRelease(oldPath);
+        _fullPath = CGPathCreateMutableCopy(bezierPath.CGPath);
+    }
     self.bzPath = bezierPath;
 }
 
@@ -286,7 +305,7 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
     // https://developer.apple.com/library/ios/documentation/UIKit/Reference/UIBezierPath_class/#//apple_ref/occ/instm/UIBezierPath/fill
     //  | This method fills the path using the current fill color and drawing properties. If the path contains any open subpaths, this method implicitly closes them before painting the fill region.
     //
-    CGPathCloseSubpath(_path);
+    CGPathCloseSubpath(_fullPath);
     [self setNeedsDisplay];
 }
 
