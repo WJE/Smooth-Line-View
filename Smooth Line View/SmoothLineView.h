@@ -37,6 +37,7 @@
 @property (nonatomic, readonly) NSMutableArray* pathSnapshots;
 
 - (void) updateWithTransform:(CGAffineTransform)transform;
+- (void) clearDrawing;
 - (void) clear;
 
 - (UIBezierPath*) path;
