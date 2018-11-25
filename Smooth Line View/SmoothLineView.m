@@ -284,7 +284,6 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
 {
     @synchronized (self)
     {
-        self setPath:<#(UIBezierPath *)#>
         [self replaceCGPathsWithNewPath:nil];
         self.bzPath = [UIBezierPath bezierPathWithCGPath:_fullPath];
     }
