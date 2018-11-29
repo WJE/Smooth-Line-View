@@ -36,8 +36,8 @@
 @property (nonatomic) BOOL renderAsArea;
 @property (nonatomic, readonly) NSMutableArray* pathSnapshots;
 
-- (id) initWithFrame:(CGRect)frame andExistingView:(SmoothLineView*)view;
 - (void) updateWithTransform:(CGAffineTransform)transform;
+- (void) clearDrawing;
 - (void) clear;
 
 - (UIBezierPath*) path;
