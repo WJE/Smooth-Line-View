@@ -240,10 +240,6 @@ CGPoint midPoint(CGPoint p1, CGPoint p2) {
         }
         LogMessage(INFO, @"Quad Curve to Point: (%@, %@), CP (%@, %@)", @(mid2.x), @(mid2.y), @(self.previousPoint.x), @(self.previousPoint.y));
     }
-//    else
-//    {
-//        [self setPath:self.bzPath];
-//    }
     
     [self setNeedsDisplayInRect:CGPathGetBoundingBox(_drawnPath)];
 }
